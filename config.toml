@@ -1,0 +1,3 @@
+[dgg]
+cdn_url = "https://cdn.destiny.gg/"
+websocket_url = "wss://chat.destiny.gg/ws"
