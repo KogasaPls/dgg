@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+echo '+cargo clippy --all --fix --allow-dirty --allow-staged'
+cargo clippy --all --fix --allow-dirty --allow-staged
+echo '+cargo fmt'
+cargo fmt

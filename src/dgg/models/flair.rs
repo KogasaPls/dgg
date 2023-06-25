@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_flair_deserialization() {
         let flairs = include_resource!("flairs.json");
-        let flairs: Vec<Flair> = serde_json::from_str(&flairs).unwrap();
+        let flairs: Vec<Flair> = serde_json::from_str(flairs).unwrap();
 
         debug!("{:#?}", flairs);
     }
