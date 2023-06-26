@@ -1,97 +1,29 @@
 use anyhow::{anyhow, bail, Context, Result};
 
 use dgg::dgg::models::event::{ChatMessageData, EventData};
-use dgg::dgg::models::flair::{Flair, FlairImage};
+use dgg::dgg::models::flair::Flair;
 
-use crate::gui::View;
-use cached::CachedAsync;
+use crate::gui::views::chat_input_view::ChatInputView;
+use crate::gui::views::chat_message_view::ChatMessageView;
+use crate::gui::{View, ViewMut};
 use eframe::egui;
-use eframe::egui::{ImageData, Response, Rgba, TextBuffer, TextureHandle, Ui};
+use eframe::egui::panel::TopBottomSide::Bottom;
+use eframe::egui::{
+    Align, Response, Rgba, ScrollArea, TextBuffer, TextStyle, TopBottomPanel, Ui, Widget,
+};
 use egui_extras::image::load_image_bytes;
 use egui_extras::RetainedImage;
-use palette::convert::TryIntoColor;
-use palette::rgb::Rgb;
-use palette::{FromColor, Hsv, IntoColor, Srgb, Srgba};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::default;
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::Arc;
-use url::quirks::username;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ChatMessageView {
-    pub username: String,
-    pub username_color: Option<Rgba>,
-    pub is_rainbow_color: bool,
-    pub message: String,
-    pub timestamp: String,
-
-    #[serde(skip)]
-    pub flair_images: Vec<Rc<RetainedImage>>,
-}
-
-impl Debug for ChatMessageView {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ChatMessageView")
-            .field("username", &self.username)
-            .field("username_color", &self.username_color)
-            .field("is_rainbow_color", &self.is_rainbow_color)
-            .field("message", &self.message)
-            .field("timestamp", &self.timestamp)
-            .finish()
-    }
-}
-
-impl ChatMessageView {
-    fn show_flairs(&self, ui: &mut Ui) {
-        for image in &self.flair_images {
-            ui.image(image.texture_id(ui.ctx()), egui::Vec2::new(16.0, 16.0));
-        }
-    }
-
-    fn show_username(&self, ui: &mut Ui) {
-        if let Some(color) = self.username_color {
-            ui.colored_label(color, &self.username);
-        } else if self.is_rainbow_color {
-            let len = self.username.len() as f32;
-
-            for (i, c) in self.username.chars().enumerate() {
-                let hue = i as f32 / len;
-                let color: Srgb = Srgb::from_color(Hsv::new(hue * 360.0, 1.0, 1.0));
-
-                let color = egui::Color32::from_rgb(
-                    (color.red) as u8,
-                    (color.green) as u8,
-                    (color.blue) as u8,
-                );
-
-                ui.colored_label(color, &c.to_string());
-            }
-        } else {
-            ui.label(&self.username);
-        }
-    }
-}
-
-impl View for ChatMessageView {
-    fn show(&self, ui: &mut Ui) -> Response {
-        ui.horizontal_wrapped(|ui| {
-            ui.label(&self.timestamp);
-            ui.separator();
-            self.show_flairs(ui);
-            self.show_username(ui);
-            ui.separator();
-            ui.label(&self.message)
-        })
-        .response
-    }
-}
-
+/// The main chat view, consisting of a list of [ChatMessageView]s and a [ChatInputView].
 #[derive(Default, Serialize, Deserialize)]
 pub struct ChatView {
+    #[serde(skip)]
+    chat_input_view: ChatInputView,
+
     #[serde(skip)]
     messages: Vec<ChatMessageView>,
     #[serde(skip)]
@@ -286,12 +218,29 @@ impl ChatView {
     }
 }
 
-impl View for ChatView {
-    fn show(&self, ui: &mut Ui) -> Response {
-        ui.vertical(|ui| {
-            for message in self.messages.iter() {
-                message.show(ui);
-            }
+impl ViewMut for ChatView {
+    fn show(&mut self, ui: &mut Ui) -> Response {
+        ui.vertical_centered(|ui| {
+            ui.vertical(|ui| {
+                ScrollArea::new([false, true]).show_rows(
+                    ui,
+                    ui.text_style_height(&TextStyle::Body),
+                    self.messages.len(),
+                    |ui, rows| {
+                        for row in rows.start..rows.end {
+                            self.messages[row].show(ui);
+                        }
+                    },
+                );
+            });
+
+            TopBottomPanel::new(Bottom, "chat-input-view").show(ui.ctx(), |ui| {
+                ui.add_sized([ui.available_width(), 80.0], |ui: &mut Ui| {
+                    self.chat_input_view.show(ui)
+                });
+
+                ui.add_space(10.0);
+            });
         })
         .response
     }

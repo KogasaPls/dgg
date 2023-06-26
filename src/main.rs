@@ -45,8 +45,10 @@ fn main() -> eframe::Result<()> {
     init();
 
     let config = ChatAppConfig::load();
-    let (tx, rx) = std::sync::mpsc::channel();
-    let services = ChatAppServices::new(config, tx);
+    let (services_tx, services_rx) = std::sync::mpsc::channel();
+    let (command_tx, command_rx) = std::sync::mpsc::channel();
+
+    let services = ChatAppServices::new(config, services_tx, Some(command_rx));
 
     let tokio = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -63,7 +65,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Destiny.gg Chat",
         native_options,
-        Box::new(|cc| Box::new(ChatApp::new(cc, rx))),
+        Box::new(|cc| Box::new(ChatApp::new(cc, services_rx, command_tx))),
     )
 }
 

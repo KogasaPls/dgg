@@ -1,49 +1,59 @@
 use dgg::config::ChatAppConfig;
 
-use crate::gui::app_services::ChatAppServiceData;
-use crate::gui::chat_view::ChatView;
-use crate::gui::View;
+use crate::gui::app_services::{ChatAppServiceMessage, Command};
+use crate::gui::views::chat_view;
+use crate::gui::views::chat_view::ChatView;
+use crate::gui::{View, ViewMut};
 use anyhow::Result;
 use dgg::dgg::models::event;
 use dgg::dgg::models::event::Event;
 use eframe::egui;
-use eframe::egui::ScrollArea;
+use eframe::egui::{ScrollArea, Widget};
 use palette::white_point::E;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
 
+/// The main application.
 #[derive(Default, Deserialize, Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[serde(default)]
 pub struct ChatApp {
     config: ChatAppConfig,
     #[serde(skip)]
-    rx: Option<Receiver<ChatAppServiceData>>,
+    rx: Option<Receiver<ChatAppServiceMessage>>,
+    #[serde(skip)]
+    command_tx: Option<Sender<Command>>,
     chat_view: ChatView,
 }
 
 impl ChatApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rx: Receiver<ChatAppServiceData>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        service_rx: Receiver<ChatAppServiceMessage>,
+        command_tx: Sender<Command>,
+    ) -> Self {
         let mut app: ChatApp = match cc.storage {
             Some(storage) => eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default(),
             None => Default::default(),
         };
 
-        app.rx = Some(rx);
+        app.rx = Some(service_rx);
         app
     }
 }
 
 impl eframe::App for ChatApp {
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // todo: repaint only on events instead of on schedule
+        ctx.request_repaint_after(Duration::from_millis(100));
+
         if let Some(rx) = &self.rx {
             for data in rx.try_iter() {
                 match data {
-                    ChatAppServiceData::Event(Event::ChatMessage(msg)) => {
+                    ChatAppServiceMessage::Event(Event::ChatMessage(msg)) => {
                         self.chat_view.add_message(msg)
                     }
-                    ChatAppServiceData::Flairs(flairs) => self.chat_view.set_flairs(flairs),
+                    ChatAppServiceMessage::Flairs(flairs) => self.chat_view.set_flairs(flairs),
                     _ => Ok(()),
                 }
                 .expect("Failed to handle event");
@@ -64,9 +74,7 @@ impl eframe::App for ChatApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ScrollArea::new([false, true]).show(ui, |ui| {
-                self.chat_view.show(ui);
-            });
+            self.chat_view.show(ui);
         });
     }
 

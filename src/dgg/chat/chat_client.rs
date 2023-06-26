@@ -3,7 +3,7 @@ use crate::dgg::models::event::Event;
 use crate::dgg::utilities::cdn::CdnClient;
 use anyhow::{bail, Context, Result};
 use futures_util::stream::FusedStream;
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 
 use tokio::net::TcpStream;
 
@@ -23,6 +23,13 @@ impl ChatClient {
             config,
             ws: None,
         }
+    }
+    
+    pub async fn send_message(&mut self, message: String) -> Result<()> {
+        let ws = self.ws.as_mut().context("Not connected")?;
+        ws.send(tokio_tungstenite::tungstenite::Message::Text(message))
+            .await?;
+        Ok(())
     }
 
     pub async fn connect(&mut self) -> Result<()> {
