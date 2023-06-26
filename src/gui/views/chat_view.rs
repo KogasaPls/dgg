@@ -3,6 +3,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use dgg::dgg::models::event::{ChatMessageData, EventData};
 use dgg::dgg::models::flair::Flair;
 
+use crate::gui::app_services::Command;
 use crate::gui::views::chat_input_view::ChatInputView;
 use crate::gui::views::chat_message_view::ChatMessageView;
 use crate::gui::{View, ViewMut};
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::sync::mpsc::Sender;
 
 /// The main chat view, consisting of a list of [ChatMessageView]s and a [ChatInputView].
 #[derive(Default, Serialize, Deserialize)]
@@ -35,6 +37,9 @@ pub struct ChatView {
 
     #[serde(skip)]
     flair_images: HashMap<String, Rc<RetainedImage>>,
+
+    #[serde(skip)]
+    command_tx: Option<Sender<Command>>,
 }
 
 impl ChatView {
@@ -137,9 +142,11 @@ impl UserStyle {
 }
 
 impl ChatView {
-    pub fn new() -> Self {
+    pub fn new(command_tx: Sender<Command>) -> Self {
         Self {
             default_username_color: Rgba::from_rgb(1.0, 1.0, 1.0),
+            command_tx: Some(command_tx.clone()),
+            chat_input_view: ChatInputView::new(command_tx),
             ..Default::default()
         }
     }

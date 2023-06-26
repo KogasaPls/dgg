@@ -23,6 +23,7 @@ pub struct ChatApp {
     rx: Option<Receiver<ChatAppServiceMessage>>,
     #[serde(skip)]
     command_tx: Option<Sender<Command>>,
+    #[serde(skip)]
     chat_view: ChatView,
 }
 
@@ -38,6 +39,7 @@ impl ChatApp {
         };
 
         app.rx = Some(service_rx);
+        app.chat_view = ChatView::new(command_tx);
         app
     }
 }
