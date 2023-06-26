@@ -1,6 +1,0 @@
-[dgg]
-cdn_url = "https://cdn.destiny.gg/"
-websocket_url = "wss://chat.destiny.gg/ws"
-
-[app]
-cache_path = "cache.json"
