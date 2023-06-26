@@ -13,6 +13,16 @@ macro_rules! include_resource {
     };
 }
 
+#[macro_export]
+macro_rules! concat_path_relative {
+    ($($path:expr),*) => {
+        concat_path!(
+            env!("CARGO_MANIFEST_DIR"),
+            $($path),*
+        )
+    };
+}
+
 #[cfg(not(target_os = "windows"))]
 concat_with::concat_impl! {
     #[macro_export]

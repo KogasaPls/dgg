@@ -19,3 +19,36 @@ pub mod ymd_hms_utc {
             .map_err(serde::de::Error::custom)
     }
 }
+
+pub mod ymd_hms_utc_option {
+    use super::ymd_hms_utc;
+    use serde::Deserialize;
+
+    pub fn serialize<S>(
+        dt: &Option<chrono::DateTime<chrono::Utc>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match dt {
+            Some(dt) => ymd_hms_utc::serialize(dt, serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let time: Option<String> = Option::deserialize(deserializer)?;
+        match time {
+            Some(time) => Ok(Some(ymd_hms_utc::deserialize(
+                serde::de::IntoDeserializer::into_deserializer(time),
+            )?)),
+            None => Ok(None),
+        }
+    }
+}

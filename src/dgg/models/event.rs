@@ -1,10 +1,11 @@
-use anyhow::{Context, Result};
-use enum_dispatch::enum_dispatch;
-use std::collections::HashMap;
-
 use crate::dgg::models::user::User;
+use anyhow::{Context, Result};
+use chrono::serde::ts_milliseconds_option;
+use chrono::{DateTime, Utc};
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 const EVENT_SERVED_CONNECTIONS: &str = "NAMES";
 const EVENT_USER_JOINED: &str = "JOIN";
@@ -33,6 +34,9 @@ pub struct BaseEventData {
     pub user: Option<User>,
     #[serde(flatten)]
     pub extra: Option<HashMap<String, Value>>,
+    #[serde(with = "ts_milliseconds_option")]
+    #[serde(default)]
+    pub timestamp: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]

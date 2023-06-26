@@ -1,15 +1,20 @@
 pub mod hex {
-    use rgb::RGB8;
+    use palette::rgb::Rgb;
     use serde::Deserialize;
 
-    pub fn serialize<S>(color: &RGB8, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(color: &Rgb, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&format!("#{:02X}{:02X}{:02X}", color.r, color.g, color.b))
+        serializer.serialize_str(&format!(
+            "#{:02x}{:02x}{:02x}",
+            (color.red * 255.0).round() as u8,
+            (color.green * 255.0).round() as u8,
+            (color.blue * 255.0).round() as u8
+        ))
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<RGB8, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Rgb, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -18,8 +23,9 @@ pub mod hex {
             let r = u8::from_str_radix(&s[1..3], 16);
             let g = u8::from_str_radix(&s[3..5], 16);
             let b = u8::from_str_radix(&s[5..7], 16);
+
             match (r, g, b) {
-                (Ok(r), Ok(g), Ok(b)) => Ok(RGB8 { r, g, b }),
+                (Ok(r), Ok(g), Ok(b)) => Ok(Rgb::from([r, g, b]).into_format()),
                 _ => Err(serde::de::Error::custom(format!("Invalid color: {}", s))),
             }
         } else {
@@ -29,21 +35,20 @@ pub mod hex {
 
     #[cfg(test)]
     mod tests {
-
-        use rgb::RGB8;
+        use palette::rgb::Rgb;
         use serde::{Deserialize, Serialize};
 
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct SerializableColor {
             #[serde(with = "super")]
-            pub color: RGB8,
+            pub color: Rgb,
         }
 
         test_serde!(
             SerializableColor,
             (
                 SerializableColor {
-                    color: RGB8::new(0, 0, 0)
+                    color: Rgb::from([0_u8, 0_u8, 0_u8]).into_format()
                 },
                 "{\"color\":\"#000000\"}"
             )
@@ -52,10 +57,10 @@ pub mod hex {
 }
 
 pub mod hex_option {
-    use rgb::RGB8;
+    use palette::rgb::Rgb;
     use serde::Deserialize;
 
-    pub fn serialize<S>(color: &Option<RGB8>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(color: &Option<Rgb>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -65,7 +70,7 @@ pub mod hex_option {
         }
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<RGB8>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Rgb>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {

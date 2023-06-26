@@ -1,27 +1,19 @@
 #![feature(lazy_cell)]
+#![warn(clippy::all, rust_2018_idioms)]
+#![allow(unused)]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 #[macro_use]
 extern crate log;
-extern crate dgg;
 
-use config::Config;
+pub mod gui;
+
+use crate::gui::app::ChatApp;
+use crate::gui::app_services::ChatAppServices;
+use futures_util::SinkExt;
+
 use dgg::config::ChatAppConfig;
 use dgg::dgg::chat::chat_client::ChatClient;
-use std::sync::LazyLock;
-
-static CONFIG: LazyLock<ChatAppConfig> = LazyLock::new(|| {
-    let config = Config::builder()
-        .add_source(config::Environment::default())
-        .add_source(
-            config::File::with_name("config")
-                .required(true)
-                .format(config::FileFormat::Toml),
-        )
-        .build()
-        .expect("Failed to load config");
-
-    ChatAppConfig::try_from(config).expect("Failed to load config")
-});
 
 fn init() {
     dotenv::dotenv().ok();
@@ -33,10 +25,10 @@ fn init() {
 }
 
 #[tokio::main]
-async fn main() {
+async fn test() {
     init();
 
-    let config = CONFIG.clone();
+    let config = ChatAppConfig::load();
     let mut client = ChatClient::new(config);
     client.connect().await.expect("Failed to connect");
 
@@ -45,4 +37,52 @@ async fn main() {
     }
 
     debug!("Connected");
+}
+
+// When compiling natively:
+#[cfg(not(target_arch = "wasm32"))]
+fn main() -> eframe::Result<()> {
+    init();
+
+    let config = ChatAppConfig::load();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let services = ChatAppServices::new(config, tx);
+
+    let tokio = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_name("dgg-chat-app-worker")
+        .worker_threads(2)
+        .build()
+        .unwrap();
+
+    tokio.spawn(async move {
+        services.start_async().await;
+    });
+
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Destiny.gg Chat",
+        native_options,
+        Box::new(|cc| Box::new(ChatApp::new(cc, rx))),
+    )
+}
+
+// When compiling to web using trunk:
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    // Redirect `log` message to `console.log` and friends:
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+
+    let web_options = eframe::WebOptions::default();
+
+    wasm_bindgen_futures::spawn_local(async {
+        eframe::WebRunner::new()
+            .start(
+                "the_canvas_id", // hardcode it
+                web_options,
+                Box::new(|cc| Box::new(eframe_template::ChatApp::new(cc))),
+            )
+            .await
+            .expect("failed to start eframe");
+    });
 }

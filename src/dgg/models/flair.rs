@@ -1,5 +1,5 @@
 use anyhow::Context;
-use rgb::RGB8;
+use palette::rgb::Rgb;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
@@ -102,7 +102,7 @@ impl From<&str> for FlairKind {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Flair {
     pub label: String,
@@ -111,7 +111,7 @@ pub struct Flair {
     pub hidden: bool,
     pub priority: u64,
     #[serde(with = "crate::common::serde::color::hex_option")]
-    pub color: Option<RGB8>,
+    pub color: Option<Rgb>,
     pub rainbow_color: bool,
     pub image: Vec<FlairImage>,
 }
@@ -123,6 +123,8 @@ pub struct FlairImage {
     pub mime: String,
     pub height: u8,
     pub width: u8,
+    #[serde(default)]
+    pub bytes: Option<Vec<u8>>,
 }
 
 #[cfg(test)]

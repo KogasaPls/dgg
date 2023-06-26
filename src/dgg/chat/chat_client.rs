@@ -4,6 +4,7 @@ use crate::dgg::utilities::cdn::CdnClient;
 use anyhow::{bail, Context, Result};
 use futures_util::stream::FusedStream;
 use futures_util::StreamExt;
+
 use tokio::net::TcpStream;
 
 use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
@@ -18,14 +19,14 @@ pub struct ChatClient {
 impl ChatClient {
     pub fn new(config: ChatAppConfig) -> Self {
         Self {
-            cdn: CdnClient::new(config.cdn_url.clone()),
+            cdn: CdnClient::new(config.get_cdn_url(), config.cache_path.clone()),
             config,
             ws: None,
         }
     }
 
     pub async fn connect(&mut self) -> Result<()> {
-        info!("Connecting to {}", self.config.websocket_url);
+        info!("Connecting to {}", self.config.get_websocket_url());
         let ws = self.create_websocket_stream().await?;
         self.ws = Some(ws);
         Ok(())
@@ -76,7 +77,7 @@ impl ChatClient {
         );
 
         let (stream, _) = tokio_tungstenite::connect_async_tls_with_config(
-            &self.config.websocket_url,
+            &self.config.get_websocket_url(),
             Some(self.config.websocket_config),
             false,
             Some(tls.clone()),
@@ -104,11 +105,11 @@ mod tests {
     static MOCK_SERVER_STARTED: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
 
     fn get_test_config() -> ChatAppConfig {
-        ChatAppConfig {
-            websocket_url: Url::parse(&format!("ws://{}", MOCK_SERVER_ADDRESS)).unwrap(),
-            cdn_url: "https://localhost".to_string().parse().unwrap(),
-            websocket_config: Default::default(),
-        }
+        ChatAppConfig::new(
+            Url::parse(&format!("ws://{}/ws", MOCK_SERVER_ADDRESS)).unwrap(),
+            Url::parse(&format!("http://{}/cdn", MOCK_SERVER_ADDRESS)).unwrap(),
+            None,
+        )
     }
 
     async fn ensure_mock_server_started() {
