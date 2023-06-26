@@ -10,8 +10,6 @@ pub struct ChatInputView {
 
 impl ViewMut for ChatInputView {
     fn show(&mut self, ui: &mut Ui) -> Response {
-        let response = ui.text_edit_multiline(&mut self.text);
-
-        response
+        ui.text_edit_multiline(&mut self.text)
     }
 }

@@ -24,7 +24,7 @@ impl ChatClient {
             ws: None,
         }
     }
-    
+
     pub async fn send_message(&mut self, message: String) -> Result<()> {
         let ws = self.ws.as_mut().context("Not connected")?;
         ws.send(tokio_tungstenite::tungstenite::Message::Text(message))
