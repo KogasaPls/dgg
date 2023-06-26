@@ -15,15 +15,11 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 /// The main application.
-#[derive(Default, Deserialize, Serialize)]
-#[serde(default)]
+#[derive(Default)]
 pub struct ChatApp {
     config: ChatAppConfig,
-    #[serde(skip)]
     rx: Option<Receiver<ChatAppServiceMessage>>,
-    #[serde(skip)]
     command_tx: Option<Sender<Command>>,
-    #[serde(skip)]
     chat_view: ChatView,
 }
 
@@ -33,14 +29,11 @@ impl ChatApp {
         service_rx: Receiver<ChatAppServiceMessage>,
         command_tx: Sender<Command>,
     ) -> Self {
-        let mut app: ChatApp = match cc.storage {
-            Some(storage) => eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default(),
-            None => Default::default(),
-        };
-
-        app.rx = Some(service_rx);
-        app.chat_view = ChatView::new(command_tx);
-        app
+        ChatApp {
+            chat_view: ChatView::new(command_tx),
+            rx: Some(service_rx),
+            ..Default::default()
+        }
     }
 }
 
@@ -78,10 +71,5 @@ impl eframe::App for ChatApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.chat_view.show(ui);
         });
-    }
-
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
     }
 }

@@ -9,15 +9,13 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 /// A single chat message.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct ChatMessageView {
     pub username: String,
     pub username_color: Option<Rgba>,
     pub is_rainbow_color: bool,
     pub message: String,
     pub timestamp: String,
-
-    #[serde(skip)]
     pub flair_images: Vec<Rc<RetainedImage>>,
 }
 

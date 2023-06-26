@@ -9,6 +9,8 @@ use url::Url;
 pub struct ChatAppConfig {
     cdn_url_str: String,
     websocket_url_str: String,
+    origin_url_str: String,
+    pub token: Option<String>,
     pub cache_path: Option<PathBuf>,
     #[serde(skip)]
     pub cdn_url: Option<Url>,
@@ -16,6 +18,8 @@ pub struct ChatAppConfig {
     pub websocket_url: Option<Url>,
     #[serde(skip)]
     pub websocket_config: WebSocketConfig,
+    #[serde(skip)]
+    pub origin_url: Option<Url>,
 }
 
 impl Default for ChatAppConfig {
@@ -25,14 +29,23 @@ impl Default for ChatAppConfig {
 }
 
 impl ChatAppConfig {
-    pub fn new(cdn_url: Url, websocket_url: Url, cache_path: Option<PathBuf>) -> Self {
+    pub fn new(
+        origin_url: Url,
+        cdn_url: Url,
+        websocket_url: Url,
+        cache_path: Option<PathBuf>,
+        token: Option<String>,
+    ) -> Self {
         Self {
+            origin_url_str: origin_url.to_string(),
+            origin_url: Some(origin_url),
             cdn_url_str: cdn_url.to_string(),
             websocket_url_str: websocket_url.to_string(),
             cdn_url: Some(cdn_url),
             cache_path,
             websocket_url: Some(websocket_url),
             websocket_config: WebSocketConfig::default(),
+            token,
         }
     }
 
@@ -65,12 +78,28 @@ impl ChatAppConfig {
             self.websocket_url_str.parse().unwrap()
         }
     }
+
+    pub fn get_origin_url(&self) -> Url {
+        if let Some(origin_url) = &self.origin_url {
+            origin_url.clone()
+        } else {
+            self.origin_url_str.parse().unwrap()
+        }
+    }
 }
 
 impl TryFrom<Config> for ChatAppConfig {
     type Error = anyhow::Error;
 
     fn try_from(config: Config) -> Result<Self, Self::Error> {
+        let mut origin_url: Url = config
+            .get_string("dgg.origin_url")
+            .context("Failed to get dgg.origin_url")?
+            .parse()?;
+        origin_url
+            .set_scheme("https")
+            .map_err(|_| anyhow::anyhow!("Failed to set scheme to https"))?;
+
         let mut cdn_url: Url = config
             .get_string("dgg.cdn_url")
             .context("Failed to get dgg.cdn_url")?
@@ -99,6 +128,14 @@ impl TryFrom<Config> for ChatAppConfig {
                 path
             });
 
-        Ok(ChatAppConfig::new(cdn_url, websocket_url, cache_path))
+        let token: Option<String> = config.get("dgg.token").unwrap();
+
+        Ok(ChatAppConfig::new(
+            origin_url,
+            cdn_url,
+            websocket_url,
+            cache_path,
+            token,
+        ))
     }
 }

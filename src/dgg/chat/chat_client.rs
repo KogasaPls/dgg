@@ -1,5 +1,5 @@
 use crate::config::ChatAppConfig;
-use crate::dgg::models::event::Event;
+use crate::dgg::models::event::{ChatMessageData, Event, EventData};
 use crate::dgg::utilities::cdn::CdnClient;
 use anyhow::{bail, Context, Result};
 use futures_util::stream::FusedStream;
@@ -7,6 +7,8 @@ use futures_util::{SinkExt, StreamExt};
 
 use tokio::net::TcpStream;
 
+use tokio_tungstenite::tungstenite::handshake::client::{generate_key, Request};
+use tokio_tungstenite::tungstenite::http;
 use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
 #[derive(Debug)]
@@ -26,8 +28,14 @@ impl ChatClient {
     }
 
     pub async fn send_message(&mut self, message: String) -> Result<()> {
+        let msg = Event::ChatMessage(EventData::<ChatMessageData> {
+            data: ChatMessageData { data: message },
+            base: Default::default(),
+        });
+        let msg_str: String = msg.try_into()?;
+
         let ws = self.ws.as_mut().context("Not connected")?;
-        ws.send(tokio_tungstenite::tungstenite::Message::Text(message))
+        ws.send(tokio_tungstenite::tungstenite::Message::Text(msg_str))
             .await?;
         Ok(())
     }
@@ -83,8 +91,25 @@ impl ChatClient {
                 .unwrap(),
         );
 
+        let origin_url = self.config.get_origin_url();
+        let websocket_url = self.config.get_websocket_url();
+
+        let request = Request::builder()
+            .uri(websocket_url.as_str())
+            .method("GET")
+            .header("Host", websocket_url.host_str().unwrap())
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header("Sec-WebSocket-Key", generate_key())
+            .version(http::Version::HTTP_11)
+            .header("Origin", origin_url.as_str())
+            .header("User-Agent", "KogasaPls/dgg")
+            .header("authtoken", self.config.token.as_ref().unwrap())
+            .body(())?;
+
         let (stream, _) = tokio_tungstenite::connect_async_tls_with_config(
-            &self.config.get_websocket_url(),
+            request,
             Some(self.config.websocket_config),
             false,
             Some(tls.clone()),
@@ -113,8 +138,10 @@ mod tests {
 
     fn get_test_config() -> ChatAppConfig {
         ChatAppConfig::new(
+            Url::parse(&format!("http://{}/", MOCK_SERVER_ADDRESS)).unwrap(),
             Url::parse(&format!("ws://{}/ws", MOCK_SERVER_ADDRESS)).unwrap(),
             Url::parse(&format!("http://{}/cdn", MOCK_SERVER_ADDRESS)).unwrap(),
+            None,
             None,
         )
     }

@@ -1,5 +1,5 @@
 use crate::dgg::models::user::User;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::serde::ts_milliseconds_option;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
@@ -115,6 +115,40 @@ impl TryFrom<&str> for Event {
         };
 
         Ok(data)
+    }
+}
+
+impl TryFrom<Event> for String {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Event) -> std::result::Result<Self, Self::Error> {
+        let event_type = match value {
+            Event::ServedConnections(_) => EVENT_SERVED_CONNECTIONS,
+            Event::UserJoined(_) => EVENT_USER_JOINED,
+            Event::UserQuit(_) => EVENT_USER_QUIT,
+            Event::Broadcast(_) => EVENT_BROADCAST,
+            Event::ChatMessage(_) => EVENT_CHAT_MESSAGE,
+            Event::Whisper(_) => EVENT_WHISPER,
+            Event::WhisperSent(_) => EVENT_WHISPER_SENT,
+            Event::Mute(_) => EVENT_MUTE,
+            Event::Unmute(_) => EVENT_UNMUTE,
+            Event::Ban(_) => EVENT_BAN,
+            Event::Unban(_) => EVENT_UNBAN,
+            Event::SubOnly(_) => EVENT_SUB_ONLY,
+            Event::Pin(_) => EVENT_PIN,
+            Event::ErrorMessage(_) => EVENT_ERROR_MESSAGE,
+            Event::BeforeEveryMessage(_) => EVENT_BEFORE_EVERY_MESSAGE,
+            Event::AfterEveryMessage(_) => EVENT_AFTER_EVERY_MESSAGE,
+            Event::Mention(_) => EVENT_MENTION,
+            Event::WebSocketError(_) => EVENT_WEBSOCKET_ERROR,
+            Event::WebSocketClose(_) => EVENT_WEBSOCKET_CLOSE,
+            Event::HandlerError(_) => EVENT_HANDLER_ERROR,
+            Event::Unknown(_) => return Err(anyhow!("Unknown event type")),
+        };
+
+        let event_json = serde_json::to_string(&value)?;
+
+        Ok(format!("{} {}", event_type, event_json))
     }
 }
 

@@ -21,24 +21,16 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 
 /// The main chat view, consisting of a list of [ChatMessageView]s and a [ChatInputView].
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ChatView {
-    #[serde(skip)]
     chat_input_view: ChatInputView,
 
-    #[serde(skip)]
     messages: Vec<ChatMessageView>,
-    #[serde(skip)]
     user_styles: HashMap<String, Option<UserStyle>>,
     default_username_color: Rgba,
-
-    #[serde(skip)]
     flairs: HashMap<String, Rc<Flair>>,
-
-    #[serde(skip)]
     flair_images: HashMap<String, Rc<RetainedImage>>,
 
-    #[serde(skip)]
     command_tx: Option<Sender<Command>>,
 }
 
@@ -100,7 +92,7 @@ impl ChatView {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Clone)]
 struct UserStyle {
     pub is_rainbow: bool,
     pub color: Option<Rgba>,

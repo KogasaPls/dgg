@@ -22,11 +22,12 @@ url = "2.4.0"
 futures-util = "0.3.28"
 reqwest = { version = "0.11.18", features = ["native-tls", "json", "serde_json", "tokio-native-tls"] }
 cached = { version = "0.44.0", features = ["tokio", "async_tokio_rt_multi_thread", "cached_proc_macro", "serde", "serde_json", "async"] }
-eframe = { version = "0.22.0", features = ["serde", "wayland", "persistence"] }
+eframe = { version = "0.22.0", features = ["serde", "wayland"] }
 palette = { version = "0.7.2", features = ["serde"] }
 egui_extras = { version = "0.22.0", features = ["chrono", "image"] }
 image = "0.24.6"
 dirs = "5.0.1"
+httparse = "1.8.0"
 
 [dependencies.config]
 version = "0.13.3"

@@ -1,3 +1,8 @@
 [dgg]
+origin_url = "https://www.destiny.gg/"
 cdn_url = "https://cdn.destiny.gg/"
 websocket_url = "wss://chat.destiny.gg/ws"
+token = ""
+
+[app]
+cache_path = "cache.json"
