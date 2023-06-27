@@ -26,6 +26,7 @@ use tokio::sync::mpsc::Sender;
 pub struct ChatView {
     chat_input_view: ChatInputView,
 
+    is_scrolled_to_bottom: bool,
     messages: Vec<ChatMessageView>,
     user_styles: HashMap<String, Option<UserStyle>>,
     default_username_color: Rgba,
@@ -72,8 +73,7 @@ impl ChatView {
         let texture = self
             .flair_images
             .get(key.as_str())
-            .context("Flair image is not loaded")
-            .unwrap();
+            .context("Flair image is not loaded")?;
 
         texture.show(ui);
 
