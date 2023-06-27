@@ -18,7 +18,7 @@ use std::sync::LazyLock;
 
 // Regex for embed links
 static EMBED_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(&format!(r"#(youtube|twitch|kick)/[a-zA-Z0-9]+")).unwrap());
+    LazyLock::new(|| Regex::new(&format!(r"#(youtube|twitch|kick)/([a-zA-Z0-9]+)")).unwrap());
 
 static LINK_FINDER: LazyLock<LinkFinder> = LazyLock::new(|| {
     let mut link_finder = LinkFinder::new();
@@ -35,7 +35,7 @@ pub struct ChatMessageView {
     pub message: String,
     pub timestamp: String,
     pub flair_images: Vec<Rc<RetainedImage>>,
-    pub message_with_emotes: Vec<TextOrEmoteOrLink>,
+    message_with_emotes: Vec<TextOrEmoteOrLink>,
 }
 
 impl Debug for ChatMessageView {
@@ -208,7 +208,7 @@ impl View for ChatMessageView {
 }
 
 #[derive(Clone)]
-pub enum TextOrEmoteOrLink {
+enum TextOrEmoteOrLink {
     Text(String),
     Emote(Rc<RetainedImage>),
     Link(String),
