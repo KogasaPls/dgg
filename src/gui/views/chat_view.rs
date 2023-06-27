@@ -12,7 +12,8 @@ use dgg::dgg::models::emote::Emote;
 use eframe::egui;
 use eframe::egui::panel::TopBottomSide::Bottom;
 use eframe::egui::{
-    Align, Response, Rgba, ScrollArea, TextBuffer, TextStyle, TopBottomPanel, Ui, Widget,
+    Align, Layout, Response, Rgba, ScrollArea, TextBuffer, TextStyle, TopBottomPanel, Ui, Vec2,
+    Widget,
 };
 use egui_extras::image::load_image_bytes;
 use egui_extras::RetainedImage;
@@ -222,7 +223,7 @@ impl ChatView {
 
 impl ViewMut for ChatView {
     fn show(&mut self, ui: &mut Ui) -> Response {
-        ui.vertical_centered(|ui| {
+        ui.with_layout(Layout::top_down(Align::Max), |ui| {
             ui.vertical(|ui| {
                 ScrollArea::new([false, true]).show_rows(
                     ui,
@@ -236,11 +237,16 @@ impl ViewMut for ChatView {
                 );
             });
 
-            TopBottomPanel::new(Bottom, "chat-input-view").show(ui.ctx(), |ui| {
+            ui.allocate_space(Vec2::from([
+                ui.available_width(),
+                ui.available_height() - 80.0,
+            ]));
+
+            ui.with_layout(Layout::bottom_up(Align::Max), |ui| {
+                ui.add_space(10.0);
                 ui.add_sized([ui.available_width(), 80.0], |ui: &mut Ui| {
                     self.chat_input_view.show(ui)
                 });
-
                 ui.add_space(10.0);
             });
         })
