@@ -90,6 +90,7 @@ async fn handle_next_command_or_event(
     select!(
         command = command_rx.recv() => {
             if let Some(Command::SendMessage(message)) = command {
+                trace!("Sending message: {:?}", message);
                 chat_client.send_message(message).await.unwrap();
             }
         }
