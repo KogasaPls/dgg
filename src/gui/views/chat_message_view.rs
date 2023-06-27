@@ -62,16 +62,23 @@ impl ChatMessageView {
         emotes: &HashMap<String, Rc<RetainedImage>>,
     ) -> Vec<TextOrEmote> {
         let mut message_with_emotes = Vec::new();
-        let mut current_word = String::new();
+        let mut push_text_or_emote = |current_word: String| {
+            if current_word.is_empty() {
+                return;
+            }
 
+            if let Some(emote) = emotes.get(&current_word) {
+                message_with_emotes.push(TextOrEmote::Emote(emote.clone()));
+            } else {
+                message_with_emotes.push(TextOrEmote::Text(current_word.clone()));
+            }
+        };
+
+        let mut current_word = String::new();
         for c in message.chars() {
             if c == ' ' {
                 // We're at the end of a word, check if it's an emote
-                if let Some(emote) = emotes.get(&current_word) {
-                    message_with_emotes.push(TextOrEmote::Emote(emote.clone()));
-                } else {
-                    message_with_emotes.push(TextOrEmote::Text(current_word.clone()));
-                }
+                push_text_or_emote(current_word.clone());
                 current_word.clear();
             } else {
                 current_word.push(c);
@@ -79,13 +86,7 @@ impl ChatMessageView {
         }
 
         // After we've processed all the characters, check if there's any remaining word
-        if !current_word.is_empty() {
-            if let Some(emote) = emotes.get(&current_word) {
-                message_with_emotes.push(TextOrEmote::Emote(emote.clone()));
-            } else {
-                message_with_emotes.push(TextOrEmote::Text(current_word.clone()));
-            }
-        }
+        push_text_or_emote(current_word.clone());
 
         message_with_emotes
     }
