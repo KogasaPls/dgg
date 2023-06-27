@@ -52,6 +52,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Destiny.gg Chat",
         native_options,
-        Box::new(|cc| Box::new(ChatApp::new(cc, event_rx, command_tx, flairs_rx))),
+        Box::new(|cc| Box::new(ChatApp::new(cc, event_rx, command_tx, flairs_rx, emotes_rx))),
     )
 }

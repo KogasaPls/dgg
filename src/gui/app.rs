@@ -6,6 +6,7 @@ use crate::gui::views::chat_view;
 use crate::gui::views::chat_view::ChatView;
 use crate::gui::{View, ViewMut};
 use anyhow::{bail, Result};
+use dgg::dgg::models::emote::Emote;
 use dgg::dgg::models::event;
 use dgg::dgg::models::event::Event;
 use dgg::dgg::models::flair::Flair;
@@ -24,6 +25,7 @@ pub struct ChatApp {
     config: ChatAppConfig,
     event_rx: Option<mpsc::Receiver<Event>>,
     flairs_rx: Option<oneshot::Receiver<HashMap<String, Flair>>>,
+    emotes_rx: Option<oneshot::Receiver<HashMap<String, Emote>>>,
     chat_view: ChatView,
 }
 
@@ -33,11 +35,13 @@ impl ChatApp {
         event_rx: mpsc::Receiver<Event>,
         command_tx: mpsc::Sender<Command>,
         flairs_rx: oneshot::Receiver<HashMap<String, Flair>>,
+        emotes_rx: oneshot::Receiver<HashMap<String, Emote>>,
     ) -> Self {
         ChatApp {
             chat_view: ChatView::new(command_tx),
             event_rx: Some(event_rx),
             flairs_rx: Some(flairs_rx),
+            emotes_rx: Some(emotes_rx),
             ..Default::default()
         }
     }
@@ -54,6 +58,15 @@ impl eframe::App for ChatApp {
                     .set_flairs(flairs)
                     .expect("Failed to set flairs");
                 self.flairs_rx = None;
+            }
+        }
+
+        if let Some(emotes_rx) = &mut self.emotes_rx {
+            if let Ok(emotes) = emotes_rx.try_recv() {
+                self.chat_view
+                    .set_emotes(emotes)
+                    .expect("Failed to set emotes");
+                self.emotes_rx = None;
             }
         }
 

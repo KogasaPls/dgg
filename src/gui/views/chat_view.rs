@@ -8,6 +8,7 @@ use crate::gui::views::chat_input_view::ChatInputView;
 use crate::gui::views::chat_message_view::ChatMessageView;
 use crate::gui::{View, ViewMut};
 use cached::CachedAsync;
+use dgg::dgg::models::emote::Emote;
 use eframe::egui;
 use eframe::egui::panel::TopBottomSide::Bottom;
 use eframe::egui::{
@@ -31,7 +32,10 @@ pub struct ChatView {
     user_styles: HashMap<String, Option<UserStyle>>,
     default_username_color: Rgba,
     flairs: HashMap<String, Rc<Flair>>,
+    emotes: HashMap<String, Rc<Emote>>,
+
     flair_images: HashMap<String, Rc<RetainedImage>>,
+    emote_images: HashMap<String, Rc<RetainedImage>>,
 
     command_tx: Option<Sender<Command>>,
 }
@@ -67,6 +71,36 @@ impl ChatView {
         Ok(())
     }
 
+    pub fn set_emotes(&mut self, emotes: HashMap<String, Emote>) -> Result<()> {
+        debug!("Updating {} emotes", emotes.len());
+
+        self.emotes = emotes.into_iter().map(|(k, v)| (k, Rc::new(v))).collect();
+        self.emote_images.clear();
+
+        for emote in self.emotes.values() {
+            if emote.image.is_empty() {
+                continue;
+            }
+
+            let maybe_bytes = emote.image[0].bytes.as_ref();
+            if maybe_bytes.is_none() {
+                continue;
+            }
+
+            let key = Self::get_emote_image_key(emote)?;
+            let bytes = maybe_bytes.ok_or(anyhow!("Emote image has no bytes"))?;
+            let image = RetainedImage::from_color_image(
+                key.clone(),
+                load_image_bytes(bytes)
+                    .ok()
+                    .ok_or(anyhow!("Failed to load image"))?,
+            );
+
+            self.emote_images.insert(key, Rc::new(image));
+        }
+        Ok(())
+    }
+
     pub fn show_flair_image(&mut self, ui: &mut Ui, flair: &Flair) -> Result<()> {
         let key = Self::get_flair_image_key(flair)?;
 
@@ -78,6 +112,18 @@ impl ChatView {
         texture.show(ui);
 
         Ok(())
+    }
+
+    fn get_emote_image_key(emote: &Emote) -> Result<String> {
+        if emote.image.is_empty() {
+            bail!("Emote {} has no image", emote.prefix);
+        }
+
+        Ok(Self::get_emote_image_key_str(emote.prefix.as_str()))
+    }
+
+    fn get_emote_image_key_str(emote_prefix: &str) -> String {
+        format!("emote_{}", emote_prefix)
     }
 
     fn get_flair_image_key(flair: &Flair) -> Result<String> {
