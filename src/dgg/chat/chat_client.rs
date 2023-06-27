@@ -147,9 +147,9 @@ mod tests {
 
     fn get_test_config() -> ChatAppConfig {
         ChatAppConfig::new(
-            Url::parse(&format!("http://{}/", MOCK_SERVER_ADDRESS)).unwrap(),
+            Url::parse(&format!("https://{}/", MOCK_SERVER_ADDRESS)).unwrap(),
             Url::parse(&format!("ws://{}/ws", MOCK_SERVER_ADDRESS)).unwrap(),
-            Url::parse(&format!("http://{}/cdn", MOCK_SERVER_ADDRESS)).unwrap(),
+            Url::parse(&format!("https://{}/cdn", MOCK_SERVER_ADDRESS)).unwrap(),
             None,
             None,
         )
