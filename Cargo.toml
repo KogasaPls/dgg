@@ -12,22 +12,24 @@ log = "0.4.19"
 pretty_env_logger = "0.5.0"
 serde = { version = "1.0.164", features = ["derive"] }
 serde_json = "1.0.97"
-tokio = { version = "1.28.2", features = ["full"] }
+
 enum_dispatch = "0.3.11"
 concat-with = "0.2.8"
 dotenv = "0.15.0"
+tokio = { version = "1.28.2", features = ["full"] }
 tokio-tungstenite = { version = "0.19.0", features = ["native-tls", "native-tls-crate", "tokio-native-tls"] }
 native-tls = "0.2.11"
 url = "2.4.0"
 futures-util = "0.3.28"
 reqwest = { version = "0.11.18", features = ["native-tls", "json", "serde_json", "tokio-native-tls"] }
 cached = { version = "0.44.0", features = ["tokio", "async_tokio_rt_multi_thread", "cached_proc_macro", "serde", "serde_json", "async"] }
-eframe = { version = "0.22.0", features = ["serde", "wayland"] }
+eframe = { version = "0.22.0", features = ["wgpu", "serde", "wayland"] }
 palette = { version = "0.7.2", features = ["serde"] }
 egui_extras = { version = "0.22.0", features = ["chrono", "image"] }
 image = "0.24.6"
 dirs = "5.0.1"
 httparse = "1.8.0"
+
 
 [dependencies.config]
 version = "0.13.3"
@@ -41,3 +43,9 @@ ctor = "0.2.2"
 version = "1.5.0"
 default-features = false
 features = ["user-hooks"]
+
+[profile.release]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 2
