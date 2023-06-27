@@ -10,10 +10,10 @@ use std::sync::Arc;
 
 use dgg::dgg::chat::chat_client;
 use dgg::dgg::models::flair::Flair;
-use tokio::join;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Mutex};
+use tokio::{join, select};
 
 /// A command sent to the ChatAppServices.
 #[derive(Debug)]
@@ -63,8 +63,7 @@ impl ChatAppServices {
             send_flairs(flairs_tx, &mut cdn_client),
             async move {
                 loop {
-                    handle_next_command(&mut command_rx, &mut chat_client).await;
-                    emit_next_event(&mut event_tx, &mut chat_client).await;
+                    handle_next_command_or_event(&mut command_rx, &mut event_tx, &mut chat_client).await;
                 }
             }
         };
@@ -78,24 +77,28 @@ async fn emit_next_event(tx: &mut Sender<Event>, chat_client: &mut ChatClient) {
     }
 }
 
-async fn handle_next_command(rx: &mut Receiver<Command>, chat_client: &mut ChatClient) {
-    match rx.try_recv() {
-        Ok(command) => {
-            debug!("Received command: {:?}", command);
-            match command {
-                Command::SendMessage(message) => {
-                    chat_client.send_message(message).await.unwrap();
-                }
-            }
-        }
-        Err(TryRecvError::Empty) => {}
-        Err(TryRecvError::Disconnected) => {
-            panic!("Command channel closed");
-        }
-    }
-}
-
 async fn send_flairs(tx: oneshot::Sender<HashMap<String, Flair>>, cdn_client: &mut CdnClient) {
     let flairs = cdn_client.get_flairs().await.unwrap();
     tx.send(flairs).unwrap();
+}
+
+async fn handle_next_command_or_event(
+    command_rx: &mut Receiver<Command>,
+    event_tx: &mut Sender<Event>,
+    chat_client: &mut ChatClient,
+) {
+    select!(
+        command = command_rx.recv() => {
+            if let Some(Command::SendMessage(message)) = command {
+                chat_client.send_message(message).await.unwrap();
+            }
+        }
+        event = chat_client.get_next_message() =>
+        {
+            if let Ok(Some(WebSocketMessage::Event(event))) = event {
+                trace!("Sending event: {:?}", event);
+                event_tx.send(event).await.unwrap();
+            }
+        }
+    )
 }
