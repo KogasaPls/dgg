@@ -32,9 +32,10 @@ fn main() -> eframe::Result<()> {
     let (event_tx, event_rx) = mpsc::channel(100);
     let (command_tx, command_rx) = mpsc::channel(100);
     let (flairs_tx, flairs_rx) = oneshot::channel();
+    let (emotes_tx, emotes_rx) = oneshot::channel();
 
     let config = ChatAppConfig::load();
-    let services = ChatAppServices::new(config, event_tx, command_rx, flairs_tx);
+    let services = ChatAppServices::new(config, event_tx, command_rx, flairs_tx, emotes_tx);
 
     let tokio = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

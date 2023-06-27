@@ -1,3 +1,4 @@
+use crate::dgg::models::image::Image;
 use anyhow::Context;
 use palette::rgb::Rgb;
 use serde::{Deserialize, Serialize};
@@ -113,18 +114,7 @@ pub struct Flair {
     #[serde(with = "crate::common::serde::color::hex_option")]
     pub color: Option<Rgb>,
     pub rainbow_color: bool,
-    pub image: Vec<FlairImage>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
-pub struct FlairImage {
-    pub url: String,
-    pub name: String,
-    pub mime: String,
-    pub height: u8,
-    pub width: u8,
-    #[serde(default)]
-    pub bytes: Option<Vec<u8>>,
+    pub image: Vec<Image>,
 }
 
 #[cfg(test)]

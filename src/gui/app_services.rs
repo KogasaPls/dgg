@@ -9,6 +9,7 @@ use std::pin::pin;
 use std::sync::Arc;
 
 use dgg::dgg::chat::chat_client;
+use dgg::dgg::models::emote::Emote;
 use dgg::dgg::models::flair::Flair;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -28,6 +29,7 @@ pub struct ChatAppServices {
     event_tx: Sender<Event>,
     command_rx: Receiver<Command>,
     flairs_tx: oneshot::Sender<HashMap<String, Flair>>,
+    emotes_tx: oneshot::Sender<HashMap<String, Emote>>,
 }
 
 impl ChatAppServices {
@@ -36,12 +38,14 @@ impl ChatAppServices {
         event_tx: Sender<Event>,
         command_rx: Receiver<Command>,
         flairs_tx: oneshot::Sender<HashMap<String, Flair>>,
+        emotes_tx: oneshot::Sender<HashMap<String, Emote>>,
     ) -> Self {
         Self {
             config,
             event_tx,
             command_rx,
             flairs_tx,
+            emotes_tx,
         }
     }
 
@@ -56,11 +60,12 @@ impl ChatAppServices {
             mut event_tx,
             mut command_rx,
             mut flairs_tx,
+            mut emotes_tx,
             ..
         } = self;
 
         join! {
-            send_flairs(flairs_tx, &mut cdn_client),
+            send_cdn_data( flairs_tx, emotes_tx, cdn_client),
             async move {
                 loop {
                     handle_next_command_or_event(&mut command_rx, &mut event_tx, &mut chat_client).await;
@@ -80,6 +85,20 @@ async fn emit_next_event(tx: &mut Sender<Event>, chat_client: &mut ChatClient) {
 async fn send_flairs(tx: oneshot::Sender<HashMap<String, Flair>>, cdn_client: &mut CdnClient) {
     let flairs = cdn_client.get_flairs().await.unwrap();
     tx.send(flairs).unwrap();
+}
+
+async fn send_emotes(tx: oneshot::Sender<HashMap<String, Emote>>, cdn_client: &mut CdnClient) {
+    let emotes = cdn_client.get_emotes().await.unwrap();
+    tx.send(emotes).unwrap();
+}
+
+async fn send_cdn_data(
+    flairs_tx: oneshot::Sender<HashMap<String, Flair>>,
+    emotes_tx: oneshot::Sender<HashMap<String, Emote>>,
+    mut cdn_client: CdnClient,
+) {
+    send_emotes(emotes_tx, &mut cdn_client).await;
+    send_flairs(flairs_tx, &mut cdn_client).await;
 }
 
 async fn handle_next_command_or_event(

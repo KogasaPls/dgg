@@ -1,10 +1,12 @@
 use crate::common::cache::JsonCache;
-use crate::dgg::models::flair::{Flair, FlairImage};
+use crate::dgg::models::flair::Flair;
 use anyhow::{Context, Result};
 
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+use crate::dgg::models::emote::Emote;
+use crate::dgg::models::image::Image;
 use std::path::PathBuf;
 use url::Url;
 
@@ -22,6 +24,43 @@ impl CdnClient {
         }
     }
 
+    pub async fn get_emotes(&mut self) -> Result<HashMap<String, Emote>> {
+        if let Some(cache) = self.cache.as_mut() {
+            let emotes = cache.get("emotes".to_string())?;
+            if let Some(emotes) = emotes {
+                info!("Using cached emotes");
+                return Ok(emotes);
+            }
+        }
+
+        info!("Not using cached emotes");
+        let emotes_endpoint_url = self.url.join("emotes/emotes.json")?;
+        let res = reqwest::get(emotes_endpoint_url)
+            .await
+            .context("Failed to get emotes")?;
+
+        let mut emotes = res
+            .json::<Vec<Emote>>()
+            .await
+            .context("Failed to parse emotes")?;
+
+        for emote in emotes.iter_mut() {
+            ensure_image_bytes_exist(&mut emote.image[0]).await?;
+        }
+
+        let emotes_map = emotes
+            .into_iter()
+            .map(|e| (e.prefix.clone(), e))
+            .collect::<HashMap<String, Emote>>();
+
+        if let Some(cache) = self.cache.as_mut() {
+            cache.set("emotes".to_string(), emotes_map.clone())?;
+            Ok(emotes_map)
+        } else {
+            Ok(emotes_map)
+        }
+    }
+
     pub async fn get_flairs(&mut self) -> Result<HashMap<String, Flair>> {
         if let Some(cache) = self.cache.as_mut() {
             let flairs = cache.get("flairs".to_string())?;
@@ -33,15 +72,16 @@ impl CdnClient {
 
         info!("Not using cached flairs");
         let flairs_endpoint_url = self.url.join("flairs/flairs.json")?;
-        let mut flairs = get_flairs_internal(flairs_endpoint_url).await?;
+        let res = reqwest::get(flairs_endpoint_url)
+            .await
+            .context("Failed to get flairs")?;
+        let mut flairs = res
+            .json::<Vec<Flair>>()
+            .await
+            .context("Failed to parse flairs")?;
 
         for flair in flairs.iter_mut() {
-            if !flair.image.is_empty() {
-                let img = flair.image.get_mut(0).unwrap();
-                let url = img.url.parse()?;
-                let bytes = get_image_bytes(url).await?;
-                img.bytes = Some(bytes);
-            }
+            ensure_image_bytes_exist(&mut flair.image[0]).await?;
         }
 
         let flairs_map = flairs
@@ -57,24 +97,7 @@ impl CdnClient {
         }
     }
 
-    pub async fn ensure_flair_image_bytes_exist(&mut self, flair: &mut Flair) -> Result<()> {
-        if flair.image.is_empty() {
-            return Ok(());
-        }
-
-        let img = flair.image.get(0).unwrap();
-        if img.bytes.is_some() {
-            return Ok(());
-        }
-
-        let url = img.url.parse()?;
-        let bytes = get_image_bytes(url).await?;
-        let img = flair.image.get_mut(0).unwrap();
-        img.bytes = Some(bytes);
-        Ok(())
-    }
-
-    pub async fn get_flair_image(&self, img: &FlairImage) -> Result<Vec<u8>> {
+    pub async fn get_image(&self, img: &Image) -> Result<Vec<u8>> {
         let url = img.url.parse()?;
         let bytes = get_image_bytes(url).await?;
         Ok(bytes)
@@ -106,15 +129,6 @@ impl std::error::Error for Error {
     }
 }
 
-async fn get_flairs_internal(url: Url) -> Result<Vec<Flair>, Error> {
-    let res = reqwest::get(url).await.context("Failed to get flairs")?;
-    let flairs = res
-        .json::<Vec<Flair>>()
-        .await
-        .context("Failed to parse flairs")?;
-    Ok(flairs)
-}
-
 async fn get_image_bytes(url: Url) -> Result<Vec<u8>, Error> {
     let res = reqwest::get(url).await.context("Failed to get image")?;
     let bytes = res
@@ -123,4 +137,15 @@ async fn get_image_bytes(url: Url) -> Result<Vec<u8>, Error> {
         .context("Failed to get image bytes")?
         .to_vec();
     Ok(bytes)
+}
+
+async fn ensure_image_bytes_exist(image: &mut Image) -> Result<()> {
+    if image.bytes.as_ref().is_some_and(|b| !b.is_empty()) {
+        return Ok(());
+    }
+
+    let url = image.url.parse()?;
+    let bytes = get_image_bytes(url).await?;
+    image.bytes = Some(bytes);
+    Ok(())
 }
