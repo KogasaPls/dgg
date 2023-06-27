@@ -7,6 +7,7 @@ use crate::gui::app_services::Command;
 use crate::gui::views::chat_input_view::ChatInputView;
 use crate::gui::views::chat_message_view::ChatMessageView;
 use crate::gui::{View, ViewMut};
+use cached::CachedAsync;
 use eframe::egui;
 use eframe::egui::panel::TopBottomSide::Bottom;
 use eframe::egui::{
@@ -177,8 +178,7 @@ impl ChatView {
             flair_images,
         };
 
-        debug!("Adding message {:?}", view);
-
+        trace!("Adding message {:?}", view);
         self.messages.push(view);
 
         Ok(())
@@ -189,31 +189,23 @@ impl ChatView {
         username: String,
         flairs: Vec<String>,
     ) -> Result<Option<UserStyle>> {
-        if self.user_styles.contains_key(username.as_str()) {
-            let user_style: Option<UserStyle> =
-                self.user_styles.get(username.as_str()).unwrap().clone();
+        match self.user_styles.get(username.as_str()) {
+            Some(user_style) => Ok(user_style.clone()),
+            None => {
+                let mut flairs = flairs
+                    .into_iter()
+                    .map(|f| {
+                        self.flairs
+                            .get(&f)
+                            .context("Flair not found")
+                            .map(|f| f.clone())
+                    })
+                    .filter_map(|f| f.ok())
+                    .collect::<Vec<Rc<Flair>>>();
 
-            return Ok(user_style);
+                Ok(Some(UserStyle::new(flairs)))
+            }
         }
-
-        if self.flairs.is_empty() {
-            return Ok(None);
-        }
-
-        let mut flairs = flairs
-            .into_iter()
-            .map(|f| {
-                self.flairs
-                    .get(&f)
-                    .context("Flair not found")
-                    .map(|f| f.clone())
-            })
-            .filter_map(|f| f.ok())
-            .collect::<Vec<Rc<Flair>>>();
-
-        let user_style = UserStyle::new(flairs);
-        self.user_styles.insert(username, Some(user_style.clone()));
-        Ok(Some(user_style))
     }
 }
 

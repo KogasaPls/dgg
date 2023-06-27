@@ -34,8 +34,11 @@ pub struct BaseEventData {
     pub user: Option<User>,
     #[serde(flatten)]
     pub extra: Option<HashMap<String, Value>>,
-    #[serde(with = "ts_milliseconds_option")]
-    #[serde(default)]
+    #[serde(
+        with = "ts_milliseconds_option",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub timestamp: Option<DateTime<Utc>>,
 }
 

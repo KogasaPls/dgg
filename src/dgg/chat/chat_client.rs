@@ -1,15 +1,23 @@
 use crate::config::ChatAppConfig;
 use crate::dgg::models::event::{ChatMessageData, Event, EventData};
 use crate::dgg::utilities::cdn::CdnClient;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures_util::stream::FusedStream;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, TryStreamExt};
 
 use tokio::net::TcpStream;
 
 use tokio_tungstenite::tungstenite::handshake::client::{generate_key, Request};
-use tokio_tungstenite::tungstenite::http;
+use tokio_tungstenite::tungstenite::{http, Message};
 use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
+
+#[derive(Debug)]
+pub enum WebSocketMessage {
+    Event(Event),
+    Ping,
+    Pong,
+    Close,
+}
 
 #[derive(Debug)]
 pub struct ChatClient {
@@ -35,8 +43,8 @@ impl ChatClient {
         let msg_str: String = msg.try_into()?;
 
         let ws = self.ws.as_mut().context("Not connected")?;
-        ws.send(tokio_tungstenite::tungstenite::Message::Text(msg_str))
-            .await?;
+        debug!("Sending: {}", msg_str);
+        ws.send(Message::Text(msg_str)).await?;
         Ok(())
     }
 
@@ -54,33 +62,34 @@ impl ChatClient {
         Ok(())
     }
 
-    pub async fn get_next_event(&mut self) -> Result<Option<Event>> {
-        let msg = self.get_next_message().await?;
-
-        match msg {
-            Some(msg) => {
-                let event = Event::try_from(msg.as_str())?;
-                Ok(Some(event))
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub async fn get_next_message(&mut self) -> Result<Option<String>> {
+    pub async fn get_next_message(&mut self) -> Result<Option<WebSocketMessage>> {
         let ws = self.ws.as_mut().context("Not connected")?;
         if ws.is_terminated() {
             bail!("Connection is closed")
         }
 
-        while let Some(msg) = ws.next().await {
-            let msg = msg?;
-            if msg.is_text() {
-                trace!("Received: {}", msg.to_text()?);
-                return Ok(Some(msg.into_text()?));
-            }
+        match ws.try_next().await? {
+            Some(msg) => match msg {
+                Message::Text(msg) => {
+                    let event = Event::try_from(msg.as_str())?;
+                    Ok(Some(WebSocketMessage::Event(event)))
+                }
+                Message::Binary(_) => Err(anyhow!("I didn't expect to get one of these")),
+                Message::Ping(_) => {
+                    debug!("Got ping, sending pong");
+                    ws.send(Message::Pong(vec![])).await?;
+                    Ok(Some(WebSocketMessage::Ping))
+                }
+                Message::Pong(_) => Ok(Some(WebSocketMessage::Pong)),
+                Message::Close(_) => {
+                    debug!("Got close, closing");
+                    ws.close(None).await?;
+                    Ok(Some(WebSocketMessage::Close))
+                }
+                _ => Ok(None),
+            },
+            None => Ok(None),
         }
-
-        Ok(None)
     }
 
     async fn create_websocket_stream(&self) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {

@@ -33,7 +33,7 @@ async fn test() {
     let mut client = ChatClient::new(config);
     client.connect().await.expect("Failed to connect");
 
-    while let Some(msg) = client.get_next_event().await.unwrap() {
+    while let Some(msg) = client.get_next_message().await.unwrap() {
         debug!("Received event: {:?}", msg);
     }
 

@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Error, Result};
 use dgg::config::ChatAppConfig;
-use dgg::dgg::chat::chat_client::ChatClient;
+use dgg::dgg::chat::chat_client::{ChatClient, WebSocketMessage};
 use dgg::dgg::models::event::Event;
 use dgg::dgg::utilities::cdn::CdnClient;
 use std::collections::HashMap;
@@ -11,6 +11,7 @@ use std::sync::Arc;
 use dgg::dgg::chat::chat_client;
 use dgg::dgg::models::flair::Flair;
 use tokio::join;
+use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Mutex};
 
@@ -71,19 +72,25 @@ impl ChatAppServices {
 }
 
 async fn emit_next_event(tx: &mut Sender<Event>, chat_client: &mut ChatClient) {
-    if let Some(event) = chat_client.get_next_event().await.unwrap() {
+    if let Some(WebSocketMessage::Event(event)) = chat_client.get_next_message().await.unwrap() {
         trace!("Sending event: {:?}", event);
         tx.send(event).await.unwrap();
     }
 }
 
 async fn handle_next_command(rx: &mut Receiver<Command>, chat_client: &mut ChatClient) {
-    if let Ok(command) = rx.try_recv() {
-        debug!("Received command: {:?}", command);
-        match command {
-            Command::SendMessage(message) => {
-                chat_client.send_message(message).await.unwrap();
+    match rx.try_recv() {
+        Ok(command) => {
+            debug!("Received command: {:?}", command);
+            match command {
+                Command::SendMessage(message) => {
+                    chat_client.send_message(message).await.unwrap();
+                }
             }
+        }
+        Err(TryRecvError::Empty) => {}
+        Err(TryRecvError::Disconnected) => {
+            panic!("Command channel closed");
         }
     }
 }

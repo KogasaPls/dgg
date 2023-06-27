@@ -1,5 +1,6 @@
 use crate::gui::app_services::Command;
 use crate::gui::{View, ViewMut};
+use anyhow::Context;
 use eframe::egui;
 use eframe::egui::{Response, Ui, Widget};
 use serde::{Deserialize, Serialize};
@@ -39,8 +40,10 @@ impl ViewMut for ChatInputView {
 
         if sent {
             if let Some(command_tx) = self.command_tx.as_ref() {
-                let text = self.text.clone();
-                let _ = command_tx.send(Command::SendMessage(text));
+                let text = self.text.trim_end().to_string();
+                command_tx
+                    .blocking_send(Command::SendMessage(text))
+                    .expect("Failed to send message");
             }
             self.text.clear();
         }
