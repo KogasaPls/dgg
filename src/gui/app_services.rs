@@ -59,7 +59,7 @@ impl ChatAppServices {
             ..
         } = self;
 
-        let (first, second) = join! {
+        join! {
             send_flairs(flairs_tx, &mut cdn_client),
             async move {
                 loop {
