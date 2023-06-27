@@ -101,18 +101,6 @@ impl ChatView {
         }
         Ok(())
     }
-
-    pub fn show_flair_image(&mut self, ui: &mut Ui, flair: &Flair) -> Result<()> {
-        let key = flair.name.clone();
-        let texture = self
-            .flair_images
-            .get(key.as_str())
-            .context("Flair image is not loaded")?;
-
-        texture.show(ui);
-
-        Ok(())
-    }
 }
 
 #[derive(Debug, Default, Clone)]
