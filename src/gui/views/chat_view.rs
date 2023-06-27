@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
 
 /// The main chat view, consisting of a list of [ChatMessageView]s and a [ChatInputView].
 #[derive(Default)]

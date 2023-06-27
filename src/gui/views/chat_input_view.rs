@@ -3,7 +3,7 @@ use crate::gui::{View, ViewMut};
 use eframe::egui;
 use eframe::egui::{Response, Ui, Widget};
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Default)]
 pub struct ChatInputView {

@@ -66,7 +66,7 @@ impl ChatClient {
         }
     }
 
-    async fn get_next_message(&mut self) -> Result<Option<String>> {
+    pub async fn get_next_message(&mut self) -> Result<Option<String>> {
         let ws = self.ws.as_mut().context("Not connected")?;
         if ws.is_terminated() {
             bail!("Connection is closed")
@@ -75,7 +75,7 @@ impl ChatClient {
         while let Some(msg) = ws.next().await {
             let msg = msg?;
             if msg.is_text() {
-                debug!("Received: {}", msg.to_text()?);
+                trace!("Received: {}", msg.to_text()?);
                 return Ok(Some(msg.into_text()?));
             }
         }

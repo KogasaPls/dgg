@@ -11,6 +11,7 @@ pub mod gui;
 use crate::gui::app::ChatApp;
 use crate::gui::app_services::ChatAppServices;
 use futures_util::SinkExt;
+use tokio::sync::{mpsc, oneshot};
 
 use dgg::config::ChatAppConfig;
 use dgg::dgg::chat::chat_client::ChatClient;
@@ -45,10 +46,11 @@ fn main() -> eframe::Result<()> {
     init();
 
     let config = ChatAppConfig::load();
-    let (services_tx, services_rx) = std::sync::mpsc::channel();
-    let (command_tx, command_rx) = std::sync::mpsc::channel();
 
-    let services = ChatAppServices::new(config, services_tx, Some(command_rx));
+    let (event_tx, event_rx) = mpsc::channel(100);
+    let (command_tx, command_rx) = mpsc::channel(100);
+    let (flairs_tx, flairs_rx) = oneshot::channel();
+    let services = ChatAppServices::new(config, event_tx, command_rx, flairs_tx);
 
     let tokio = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -58,14 +60,14 @@ fn main() -> eframe::Result<()> {
         .unwrap();
 
     tokio.spawn(async move {
-        services.start_async().await;
+        services.start().await;
     });
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "Destiny.gg Chat",
         native_options,
-        Box::new(|cc| Box::new(ChatApp::new(cc, services_rx, command_tx))),
+        Box::new(|cc| Box::new(ChatApp::new(cc, event_rx, command_tx, flairs_rx))),
     )
 }
 

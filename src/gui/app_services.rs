@@ -5,9 +5,14 @@ use dgg::dgg::models::event::Event;
 use dgg::dgg::utilities::cdn::CdnClient;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::pin::pin;
+use std::sync::Arc;
 
+use dgg::dgg::chat::chat_client;
 use dgg::dgg::models::flair::Flair;
-use std::sync::mpsc::{Receiver, Sender};
+use tokio::join;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{oneshot, Mutex};
 
 /// A command sent to the ChatAppServices.
 #[derive(Debug)]
@@ -15,146 +20,75 @@ pub enum Command {
     SendMessage(String),
 }
 
-/// A message sent from the ChatAppServices.
 #[derive(Debug)]
-pub enum ChatAppServiceMessage {
-    Event(Event),
-    Flairs(HashMap<String, Flair>),
-    Command(Command),
-}
-
-#[derive(Debug)]
-/// Responsible for emitting data (events, asynchronously loaded data, etc.) for the GUI.
+/// Receives commands from the UI, and sends events and other data back.
 pub struct ChatAppServices {
     config: ChatAppConfig,
-    tx: Sender<ChatAppServiceMessage>,
-    rx: Option<Receiver<Command>>,
-    chat_client: Option<ChatClient>,
-    cdn_client: Option<CdnClient>,
+    event_tx: Sender<Event>,
+    command_rx: Receiver<Command>,
+    flairs_tx: oneshot::Sender<HashMap<String, Flair>>,
 }
 
 impl ChatAppServices {
     pub fn new(
         config: ChatAppConfig,
-        service_tx: Sender<ChatAppServiceMessage>,
-        command_rx: Option<Receiver<Command>>,
+        event_tx: Sender<Event>,
+        command_rx: Receiver<Command>,
+        flairs_tx: oneshot::Sender<HashMap<String, Flair>>,
     ) -> Self {
         Self {
             config,
-            tx: service_tx,
-            rx: command_rx,
-            chat_client: None,
-            cdn_client: None,
+            event_tx,
+            command_rx,
+            flairs_tx,
         }
     }
 
-    pub async fn start_async(mut self) -> Result<()> {
+    pub async fn start(self) {
         info!("Starting app services...");
-        self.initialize_async().await?;
-        self.send_flairs().await?;
-        self.handle_events().await;
-        Ok(())
-    }
+        let mut cdn_client =
+            CdnClient::new(self.config.get_cdn_url(), self.config.cache_path.clone());
+        let mut chat_client = ChatClient::new(self.config);
+        chat_client.connect().await.unwrap();
 
-    async fn send_flairs(&mut self) -> Result<()> {
-        debug!("Sending flairs...");
-        let cdn_client = self.get_cdn_client_mut().unwrap();
-        let mut flairs = cdn_client.get_flairs().await.unwrap();
-        self.send_data(ChatAppServiceMessage::Flairs(flairs)).await
-    }
+        let Self {
+            mut event_tx,
+            mut command_rx,
+            mut flairs_tx,
+            ..
+        } = self;
 
-    async fn handle_events(mut self) {
-        debug!("Handling events...");
-        tokio::spawn(async move {
-            loop {
-                self.handle_commands();
-                self.handle_next_event().await.unwrap();
-            }
-        });
-    }
-
-    async fn initialize_async(&mut self) -> Result<()> {
-        debug!("Initializing app services");
-        self.initialize_chat_client().await?;
-        self.initialize_cdn_client()?;
-        Ok(())
-    }
-
-    fn get_cdn_client(&self) -> Result<&CdnClient> {
-        self.cdn_client
-            .as_ref()
-            .context("CDN client not initialized")
-    }
-
-    fn get_cdn_client_mut(&mut self) -> Result<&mut CdnClient> {
-        self.cdn_client
-            .as_mut()
-            .context("CDN client not initialized")
-    }
-
-    fn get_chat_client(&self) -> Result<&ChatClient> {
-        self.chat_client
-            .as_ref()
-            .context("Chat client not initialized")
-    }
-
-    fn get_chat_client_mut(&mut self) -> Result<&mut ChatClient> {
-        self.chat_client
-            .as_mut()
-            .context("Chat client not initialized")
-    }
-
-    async fn initialize_chat_client(&mut self) -> Result<()> {
-        debug!("Initializing chat client");
-        let mut chat_client = ChatClient::new(self.config.clone());
-        chat_client.connect().await?;
-        self.chat_client = Some(chat_client);
-
-        Ok(())
-    }
-
-    fn initialize_cdn_client(&mut self) -> Result<()> {
-        debug!("Initializing CDN client");
-        let cdn_url = self.config.cdn_url.clone().context("CDN URL not set")?;
-        let cdn_client = CdnClient::new(cdn_url, self.config.cache_path.clone());
-        self.cdn_client = Some(cdn_client);
-
-        Ok(())
-    }
-
-    async fn handle_commands(&mut self) -> Result<()> {
-        trace!("Handling commands...");
-
-        if let Some(rx) = &mut self.rx {
-            if let Ok(command) = rx.try_recv() {
-                debug!("Received command: {:?}", command);
-                match command {
-                    Command::SendMessage(message) => {
-                        self.get_chat_client_mut()?.send_message(message).await?;
-                    }
+        let (first, second) = join! {
+            send_flairs(flairs_tx, &mut cdn_client),
+            async move {
+                loop {
+                    handle_next_command(&mut command_rx, &mut chat_client).await;
+                    emit_next_event(&mut event_tx, &mut chat_client).await;
                 }
             }
+        };
+    }
+}
+
+async fn emit_next_event(tx: &mut Sender<Event>, chat_client: &mut ChatClient) {
+    if let Some(event) = chat_client.get_next_event().await.unwrap() {
+        trace!("Sending event: {:?}", event);
+        tx.send(event).await.unwrap();
+    }
+}
+
+async fn handle_next_command(rx: &mut Receiver<Command>, chat_client: &mut ChatClient) {
+    if let Ok(command) = rx.try_recv() {
+        debug!("Received command: {:?}", command);
+        match command {
+            Command::SendMessage(message) => {
+                chat_client.send_message(message).await.unwrap();
+            }
         }
-
-        Ok(())
     }
+}
 
-    async fn handle_next_event(&mut self) -> Result<()> {
-        trace!("Waiting for event...");
-
-        let event = self
-            .get_chat_client_mut()?
-            .get_next_event()
-            .await?
-            .context("No event received")?;
-
-        self.send_data(ChatAppServiceMessage::Event(event)).await?;
-
-        Ok(())
-    }
-
-    async fn send_data(&mut self, data: ChatAppServiceMessage) -> Result<()> {
-        self.tx.send(data)?;
-        Ok(())
-    }
+async fn send_flairs(tx: oneshot::Sender<HashMap<String, Flair>>, cdn_client: &mut CdnClient) {
+    let flairs = cdn_client.get_flairs().await.unwrap();
+    tx.send(flairs).unwrap();
 }
