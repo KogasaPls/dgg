@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 use tokio::sync::mpsc::Sender;
+use url::quirks::username;
 
 /// The main chat view, consisting of a list of [ChatMessageView]s and a [ChatInputView].
 #[derive(Default)]
@@ -57,7 +58,7 @@ impl ChatView {
                 continue;
             }
 
-            let key = Self::get_flair_image_key(flair)?;
+            let key = flair.name.clone();
             let bytes = maybe_bytes.ok_or(anyhow!("Flair image has no bytes"))?;
             let image = RetainedImage::from_color_image(
                 key.clone(),
@@ -87,7 +88,7 @@ impl ChatView {
                 continue;
             }
 
-            let key = Self::get_emote_image_key(emote)?;
+            let key = emote.prefix.clone();
             let bytes = maybe_bytes.ok_or(anyhow!("Emote image has no bytes"))?;
             let image = RetainedImage::from_color_image(
                 key.clone(),
@@ -102,8 +103,7 @@ impl ChatView {
     }
 
     pub fn show_flair_image(&mut self, ui: &mut Ui, flair: &Flair) -> Result<()> {
-        let key = Self::get_flair_image_key(flair)?;
-
+        let key = flair.name.clone();
         let texture = self
             .flair_images
             .get(key.as_str())
@@ -112,30 +112,6 @@ impl ChatView {
         texture.show(ui);
 
         Ok(())
-    }
-
-    fn get_emote_image_key(emote: &Emote) -> Result<String> {
-        if emote.image.is_empty() {
-            bail!("Emote {} has no image", emote.prefix);
-        }
-
-        Ok(Self::get_emote_image_key_str(emote.prefix.as_str()))
-    }
-
-    fn get_emote_image_key_str(emote_prefix: &str) -> String {
-        format!("emote_{}", emote_prefix)
-    }
-
-    fn get_flair_image_key(flair: &Flair) -> Result<String> {
-        if flair.image.is_empty() {
-            bail!("Flair {} has no image", flair.name);
-        }
-
-        Ok(Self::get_flair_image_key_str(flair.name.as_str()))
-    }
-
-    fn get_flair_image_key_str(flair_name: &str) -> String {
-        format!("flair_{}", flair_name)
     }
 }
 
@@ -209,20 +185,21 @@ impl ChatView {
             .filter(|f| !f.image.is_empty())
             .map(|f| {
                 self.flair_images
-                    .get(Self::get_flair_image_key(f).unwrap().as_str())
+                    .get(f.name.as_str())
                     .cloned()
                     .expect(format!("Flair has no image data: {}.", f.name).as_str())
             })
             .collect::<Vec<Rc<RetainedImage>>>();
 
-        let view = ChatMessageView {
-            message: msg.data.data,
-            username: user.nick,
-            username_color: user_style.color,
-            is_rainbow_color: user_style.is_rainbow,
+        let view = ChatMessageView::new(
+            user.nick,
+            user_style.color,
+            user_style.is_rainbow,
+            msg.data.data,
             timestamp,
             flair_images,
-        };
+            &self.emote_images,
+        );
 
         trace!("Adding message {:?}", view);
         self.messages.push(view);
