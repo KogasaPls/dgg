@@ -25,16 +25,14 @@ fn init() {
     info!("Starting...");
 }
 
-// When compiling natively:
-#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     init();
-
-    let config = ChatAppConfig::load();
 
     let (event_tx, event_rx) = mpsc::channel(100);
     let (command_tx, command_rx) = mpsc::channel(100);
     let (flairs_tx, flairs_rx) = oneshot::channel();
+
+    let config = ChatAppConfig::load();
     let services = ChatAppServices::new(config, event_tx, command_rx, flairs_tx);
 
     let tokio = tokio::runtime::Builder::new_multi_thread()
