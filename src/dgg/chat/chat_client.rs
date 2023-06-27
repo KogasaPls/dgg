@@ -8,7 +8,7 @@ use futures_util::{SinkExt, TryStreamExt};
 use tokio::net::TcpStream;
 
 use tokio_tungstenite::tungstenite::handshake::client::{generate_key, Request};
-use tokio_tungstenite::tungstenite::{http, Message};
+use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
 #[derive(Debug)]
@@ -111,10 +111,12 @@ impl ChatClient {
             .header("Upgrade", "websocket")
             .header("Sec-WebSocket-Version", "13")
             .header("Sec-WebSocket-Key", generate_key())
-            .version(http::Version::HTTP_11)
             .header("Origin", origin_url.as_str())
             .header("User-Agent", "KogasaPls/dgg")
-            .header("authtoken", self.config.token.as_ref().unwrap())
+            .header(
+                "Cookie",
+                format!("authtoken={}", self.config.token.as_ref().unwrap()),
+            )
             .body(())?;
 
         let (stream, _) = tokio_tungstenite::connect_async_tls_with_config(

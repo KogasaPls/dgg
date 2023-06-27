@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+const EVENT_ME: &str = "ME";
 const EVENT_SERVED_CONNECTIONS: &str = "NAMES";
 const EVENT_USER_JOINED: &str = "JOIN";
 const EVENT_USER_QUIT: &str = "QUIT";
@@ -54,6 +55,7 @@ pub struct EventData<T> {
 #[enum_dispatch(EventType)]
 #[serde(untagged)]
 pub enum Event {
+    Connected(BaseEventData),
     ServedConnections(EventData<ServedConnectionsData>),
     UserJoined(BaseEventData),
     UserQuit(BaseEventData),
@@ -90,6 +92,7 @@ impl TryFrom<&str> for Event {
         }
 
         let data = match event_type {
+            EVENT_ME => Event::Connected(serde_json::from_str(event_json)?),
             EVENT_SERVED_CONNECTIONS => Event::ServedConnections(serde_json::from_str(event_json)?),
             EVENT_USER_JOINED => Event::UserJoined(serde_json::from_str(event_json)?),
             EVENT_USER_QUIT => Event::UserQuit(serde_json::from_str(event_json)?),
@@ -126,6 +129,7 @@ impl TryFrom<Event> for String {
 
     fn try_from(value: Event) -> std::result::Result<Self, Self::Error> {
         let event_type = match value {
+            Event::Connected(_) => EVENT_ME,
             Event::ServedConnections(_) => EVENT_SERVED_CONNECTIONS,
             Event::UserJoined(_) => EVENT_USER_JOINED,
             Event::UserQuit(_) => EVENT_USER_QUIT,

@@ -10,6 +10,7 @@ pub mod gui;
 
 use crate::gui::app::ChatApp;
 use crate::gui::app_services::ChatAppServices;
+use futures_util::task::SpawnExt;
 use futures_util::SinkExt;
 use tokio::sync::{mpsc, oneshot};
 

@@ -84,13 +84,31 @@ impl eframe::App for ChatApp {
 
 fn handle_event(event_rx: &mut mpsc::Receiver<Event>, chat_view: &mut ChatView) -> Result<()> {
     match event_rx.try_recv() {
-        Ok(data) => match data {
-            Event::ChatMessage(msg) => chat_view.add_message(msg),
-            _ => Ok(()),
-        },
-        Err(TryRecvError::Empty) => Ok(()),
+        Ok(Event::ChatMessage(msg)) => chat_view.add_message(msg)?,
+        Ok(Event::Connected(data)) => {
+            info!(
+                "Connected as {}",
+                data.user.map(|u| u.nick).unwrap_or("Anonymous".to_string())
+            );
+        }
+        Ok(Event::Pin(pin)) => {
+            info!("Pin: {:?}", pin)
+        }
+        Ok(Event::Broadcast(broadcast)) => {
+            info!("Broadcast: {:?}", broadcast)
+        }
+        Ok(Event::ErrorMessage(err)) => {
+            error!("Error: {:?}", err)
+        }
+        Ok(Event::Unknown(msg)) => {
+            warn!("Unknown: {:?}", msg)
+        }
+        Err(TryRecvError::Empty) => {}
         Err(e) => {
             panic!("Error receiving event: {:?}", e);
+        }
+        Ok(e) => {
+            debug!(" {:?}", e);
         }
     };
 
