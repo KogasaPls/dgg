@@ -956,10 +956,12 @@ dependencies = [
  "futures-util",
  "httparse",
  "image",
+ "linkify",
  "log",
  "native-tls",
  "palette",
  "pretty_env_logger",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -2023,6 +2025,15 @@ checksum = "d580318f95776505201b28cf98eb1fa5e4be3b689633ba6a3e6cd880ff22d8cb"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "linkify"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dfa36d52c581e9ec783a7ce2a5e0143da6237be5811a0b3153fedfdbe9f780"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

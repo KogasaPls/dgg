@@ -26,6 +26,8 @@ egui_extras = { version = "0.22.0", features = ["chrono", "image"] }
 image = "0.24.6"
 dirs = "5.0.1"
 httparse = "1.8.0"
+regex = "1.8.4"
+linkify = "0.10.0"
 
 
 [dependencies.config]
