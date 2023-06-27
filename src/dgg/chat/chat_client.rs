@@ -74,9 +74,9 @@ impl ChatClient {
                     let event = Event::try_from(msg.as_str())?;
                     Ok(Some(WebSocketMessage::Event(event)))
                 }
-                Message::Binary(_) => Err(anyhow!("I didn't expect to get one of these")),
+                Message::Binary(b) => Err(anyhow!("I didn't expect to get one of these: {:?}", b)),
                 Message::Ping(_) => {
-                    debug!("Got ping, sending pong");
+                    trace!("Got ping, sending pong");
                     ws.send(Message::Pong(vec![])).await?;
                     Ok(Some(WebSocketMessage::Ping))
                 }
